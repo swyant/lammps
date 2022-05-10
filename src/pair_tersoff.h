@@ -33,6 +33,7 @@ class PairTersoff : public Pair {
   void coeff(int, char **);
   virtual void init_style();
   double init_one(int, int);
+  //int get_node_rank(); //spencer
 
   template <int SHIFT_FLAG, int EVFLAG, int EFLAG, int VFLAG_ATOM> void eval();
 
@@ -55,7 +56,8 @@ class PairTersoff : public Pair {
     double powern_del;
     double c0;    // added for TersoffMODC
   };
-
+  
+  FILE *rank_dfile; // spencer
   Param *params;      // parameter set for an I-J-K interaction
   double cutmax;      // max cutoff for all elements
   int maxshort;       // size of short neighbor list array

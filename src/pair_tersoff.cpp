@@ -18,7 +18,14 @@
 ------------------------------------------------------------------------- */
 
 #include "pair_tersoff.h"
-
+//Spencer 
+#include <iostream>
+#include <string.h>
+#include <iomanip>
+#include <limits>
+#include <cstdlib>
+#include <mpi.h>
+//
 #include "atom.h"
 #include "comm.h"
 #include "error.h"
@@ -77,6 +84,7 @@ PairTersoff::~PairTersoff()
     memory->destroy(cutsq);
     memory->destroy(neighshort);
   }
+  fclose(rank_dfile);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -113,6 +121,17 @@ void PairTersoff::compute(int eflag, int vflag)
 template <int SHIFT_FLAG, int EVFLAG, int EFLAG, int VFLAG_EITHER>
 void PairTersoff::eval()
 {
+  printf("CALLED\n");
+  fprintf(rank_dfile,"rank %d\n", comm->me);
+  //int rank;
+  //int n, namelen, color, rank, nprocs, myrank;
+  //size_t bytes;
+  //MPI_Comm nodeComm;  
+  //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  //printf("%d", rank);
+  //MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  //MPI_Get_processor_name(host_name,&namelen);
+ 
   int i,j,k,ii,jj,kk,inum,jnum;
   int itype,jtype,ktype,iparam_ij,iparam_ijk;
   tagint itag,jtag;
@@ -147,6 +166,7 @@ void PairTersoff::eval()
   for (ii = 0; ii < inum; ii++) {
     i = ilist[ii];
     itag = tag[i];
+    fprintf(rank_dfile,"i: %d\n", itag);
     itype = map[type[i]];
     xtmp = x[i][0];
     ytmp = x[i][1];
@@ -185,15 +205,33 @@ void PairTersoff::eval()
       }
 
       jtag = tag[j];
+      fprintf(rank_dfile,"    j: %d", jtag);
+
       if (itag > jtag) {
-        if ((itag+jtag) % 2 == 0) continue;
+        if ((itag+jtag) % 2 == 0) {
+          fprintf(rank_dfile,"\n");
+          continue;
+        }
       } else if (itag < jtag) {
-        if ((itag+jtag) % 2 == 1) continue;
+        if ((itag+jtag) % 2 == 1){
+          fprintf(rank_dfile,"\n");
+          continue;
+        }
       } else {
-        if (x[j][2] < x[i][2]) continue;
-        if (x[j][2] == ztmp && x[j][1] < ytmp) continue;
-        if (x[j][2] == ztmp && x[j][1] == ytmp && x[j][0] < xtmp) continue;
+        if (x[j][2] < x[i][2]) {
+          fprintf(rank_dfile,"\n");
+          continue;
+        }
+        if (x[j][2] == ztmp && x[j][1] < ytmp){
+          fprintf(rank_dfile,"\n");
+          continue;
+        }
+        if (x[j][2] == ztmp && x[j][1] == ytmp && x[j][0] < xtmp) {
+          fprintf(rank_dfile,"\n");
+          continue;
+        }
       }
+      fprintf(rank_dfile," - PASSED THE IF GAUNTLET\n");
 
       jtype = map[type[j]];
       iparam_ij = elem3param[itype][jtype][jtype];
@@ -367,6 +405,11 @@ void PairTersoff::settings(int narg, char **arg)
       iarg += 2;
     } else error->all(FLERR,"Illegal pair_style command");
   }
+
+  int rnk = comm->me;
+  std::string out_fname = "rank_" + std::to_string(rnk) + ".txt";
+  printf("%s\n", out_fname.c_str());
+  rank_dfile = fopen(out_fname.c_str(),"w");
 }
 
 /* ----------------------------------------------------------------------
@@ -813,3 +856,78 @@ void PairTersoff::costheta_d(double *rij_hat, double rijinv,
   add3(drj,drk,dri);
   scale3(-1.0,dri);
 }
+
+//int PairTersoff::get_node_rank() {
+//    char host_name[MPI_MAX_PROCESSOR_NAME];
+//    memset(host_name, '\0', sizeof(char) * MPI_MAX_PROCESSOR_NAME);
+//    char (*host_names)[MPI_MAX_PROCESSOR_NAME];
+//    int n, namelen, color, rank, nprocs, myrank;
+//    size_t bytes;
+//    MPI_Comm nodeComm;
+//    
+//    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+//    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+//    MPI_Get_processor_name(host_name,&namelen);
+//
+//    bytes = nprocs * sizeof(char[MPI_MAX_PROCESSOR_NAME]);
+//    host_names = (char (*)[MPI_MAX_PROCESSOR_NAME]) malloc(bytes);
+//    for (int ii = 0; ii < nprocs; ii++) {
+//        memset(host_names[ii], '\0', sizeof(char) * MPI_MAX_PROCESSOR_NAME);
+//    }
+//    
+//    strcpy(host_names[rank], host_name);
+//
+//    for (n=0; n<nprocs; n++)
+//        MPI_Bcast(&(host_names[n]),MPI_MAX_PROCESSOR_NAME, MPI_CHAR, n, MPI_COMM_WORLD);
+//    qsort(host_names, nprocs,  sizeof(char[MPI_MAX_PROCESSOR_NAME]), stringCmp);
+//
+//    color = 0;
+//    for (n=0; n<nprocs-1; n++)
+//    {
+//        if(strcmp(host_name, host_names[n]) == 0)
+//        {
+//            break;
+//        }
+//        if(strcmp(host_names[n], host_names[n+1]))
+//        {
+//            color++;
+//        }
+//    }
+//
+//    MPI_Comm_split(MPI_COMM_WORLD, color, 0, &nodeComm);
+//    MPI_Comm_rank(nodeComm, &myrank);
+//
+//    MPI_Barrier(MPI_COMM_WORLD);
+//    int looprank=myrank;
+//    // printf (" Assigning device %d  to process on node %s rank %d, OK\n",looprank,  host_name, rank );
+//    free(host_names);
+//    return looprank;
+//}
+//
+//#include "mpi.h"
+//
+//using namespace std;
+//
+//using namespace MC_NS;
+//
+//MC::MC(int narg, char **arg)
+//{
+//
+//    /************************** Set up MPI settings **************************/
+//
+//    int color,key,global,local;
+//    MPI_Comm comm;
+//
+//    // Split the communicators so that multiple instances of LAMMPS can be run
+//    MPI_Comm_rank(MPI_COMM_WORLD, &global);
+//    color = global / 1; // Change "1" to 2 in order to use 2 procs per instance, etc..
+//    key = global; 
+//    MPI_Comm_split(MPI_COMM_WORLD, color, key, &comm);
+//    MPI_Comm_rank(comm,&local);
+//
+//    //  Get the number of processes.
+//    nprocs = MPI::COMM_WORLD.Get_size ( ); //Get_size gets number of processes (np) in communicator group
+//    //  Get the individual process ID.
+//    rank = MPI::COMM_WORLD.Get_rank ( ); // Get_rank gets the rank of the calling process in the communicator
+//
+//
