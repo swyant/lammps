@@ -1501,3 +1501,6 @@
 /pair_smtbq.h
 /pair_vashishta*.cpp
 /pair_vashishta*.h
+/ewald_const.h
+/pair_sw_mod.cpp
+/pair_sw_mod.h
