@@ -107,7 +107,7 @@ void ComputePODGlobal::init_list(int /*id*/, NeighList *ptr)
 void ComputePODGlobal::compute_array()
 {
   // int ntotal = atom->nlocal + atom->nghost;
-  invoked_peratom = update->ntimestep;
+  invoked_array = update->ntimestep;
 
   // clear global array
 
