@@ -32,6 +32,12 @@
 #include <cstring>
 #include <chrono>
 
+// for logging 
+#include <fstream>
+#include <iostream>
+#include <iomanip>
+
+
 #include "eapod.h"
 
 using namespace LAMMPS_NS;
@@ -155,6 +161,76 @@ PairPOD::~PairPOD()
   }
 }
 
+void PairPOD::writeArrayToFile(const double* my_arr, int size, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    file << std::fixed << std::setprecision(22);
+
+    for (int i = 0; i < size; ++i) {
+        file << my_arr[i] << "\n";
+    }
+
+    file.close();
+}
+
+void PairPOD::writeArrayToFile(const int* my_arr, int size, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    file << std::fixed << std::setprecision(22);
+
+    for (int i = 0; i < size; ++i) {
+        file << my_arr[i] << "\n";
+    }
+
+    file.close();
+}
+
+void PairPOD::writeMatrixToFile(double** my_arr, int nrows, int ncols, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    file << std::fixed << std::setprecision(22);
+
+    for (int i = 0; i < nrows; ++i) {
+      for (int j = 0; j < ncols; ++j) { 
+        file << my_arr[i][j] << " ";
+      }
+      file << "\n";
+    }
+
+    file.close();
+}
+
+void PairPOD::writeRaggedToFile(int** my_arr, int nrows, int* numneigh, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    file << std::fixed << std::setprecision(22);
+
+    for (int i = 0; i < nrows; ++i) {
+      int nj = numneigh[i];
+      for (int j = 0; j < nj; ++j) { 
+        file << my_arr[i][j] << " ";
+      }
+      file << "\n";
+    }
+
+    file.close();
+}
 void PairPOD::compute(int eflag, int vflag)
 {
   ev_init(eflag, vflag);
@@ -168,15 +244,25 @@ void PairPOD::compute(int eflag, int vflag)
 //       error->warning(FLERR, "Pair style pod does not support per-atom energies or stresses");
 //   }
 
-  double **x = atom->x;
-  double **f = atom->f;
-  int **firstneigh = list->firstneigh;
-  int *numneigh = list->numneigh;
-  int *type = atom->type;
-  int *ilist = list->ilist;
+  double **x = atom->x; //(nlocal+nghost)*3
+  double **f = atom->f; //inum*3
+  int **firstneigh = list->firstneigh; //inum*numneigh[i] (ragged)
+  int *numneigh = list->numneigh; //inum
+  int *type = atom->type; //inum
+  int *ilist = list->ilist; //inum
   int inum = list->inum;
   int nlocal = atom->nlocal;
   int newton_pair = force->newton_pair;
+  int nmax = atom->nmax;
+  int nghost = atom->nghost;
+    
+  // assume mpirun np -1, so inum == # of atoms
+  writeArrayToFile(numneigh, inum, "numneigh.txt");
+  writeArrayToFile(type, inum, "type.txt");
+  writeArrayToFile(ilist, inum, "ilist.txt");
+  writeMatrixToFile(x,nlocal+nghost,3,"x.txt");
+  writeMatrixToFile(f,inum,3,"f.txt");
+  writeRaggedToFile(firstneigh,inum,numneigh,"firstneigh.txt");
 
   double rcutsq = rcut*rcut;
   double evdwl = 0.0;
@@ -364,6 +450,10 @@ void PairPOD::lammpsNeighborList(double *rij1, int *ai1, int *aj1, int *ti1, int
   int m = numneigh[gi];
   for (int l = 0; l < m; l++) {           // loop over each atom around atom i
     int gj = firstneigh[gi][l];           // atom j
+    //if (gi ==0){
+    //  std::cout << "gj value for gi==0: " << gj << std::endl;
+    //  std::cout << "x[gj][0] value for gi==0: " << x[gj][0] << std::endl;
+    //}
     double delx = x[gj][0] - x[gi][0];    // xj - xi
     double dely = x[gj][1] - x[gi][1];    // xj - xi
     double delz = x[gj][2] - x[gi][2];    // xj - xi

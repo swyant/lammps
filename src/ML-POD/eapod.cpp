@@ -25,6 +25,11 @@
 #include "memory.h"
 #include "tokenizer.h"
 
+// for logging 
+#include <fstream>
+#include <iostream>
+#include <iomanip>
+
 #include <cmath>
 
 // header file. Moved down here to avoid polluting other headers with its defines
@@ -2655,6 +2660,23 @@ void EAPOD::gaussiansnapshots(double *rbf, double *rij, double *gaussianexponent
   }
 }
 
+void EAPOD::writeArrayToFile(const double* my_arr, int size, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    file << std::fixed << std::setprecision(22);
+
+    for (int i = 0; i < size; ++i) {
+        file << my_arr[i] << "\n";
+    }
+
+    file.close();
+}
+
+
 /**
  * @brief Perform eigenvalue decomposition of the snapshots matrix S and return the eigenvectors and eigenvalues.
  *
@@ -2694,7 +2716,10 @@ void EAPOD::eigenvaluedecomposition(double *Phi, double *Lambda, int N)
     snapshots(S, xij, N);
   else
     gaussiansnapshots(S, xij, gaussianexponents, polydegrees, rin, rcut-rin, ngaussianfuncs, N);
-            
+
+  //writeArrayToFile(S, N*ns, "S.txt");
+
+
   // Compute the matrix A = S^T * S
   char chn = 'N';
   char cht = 'T';
@@ -2705,6 +2730,8 @@ void EAPOD::eigenvaluedecomposition(double *Phi, double *Lambda, int N)
   for (int i=0; i<ns*ns; i++)
     A[i] = A[i]*(1.0/N);
 
+  //writeArrayToFile(A, ns*ns, "A.txt");
+
   // Compute the eigenvectors and eigenvalues of A
   int lwork = ns * ns;  // the length of the array work, lwork >= max(1,3*N-1)
   int info = 1;     // = 0:  successful exit
@@ -2712,6 +2739,9 @@ void EAPOD::eigenvaluedecomposition(double *Phi, double *Lambda, int N)
   char chv = 'V';
   char chu = 'U';
   DSYEV(&chv, &chu, &ns, A, &ns, b, work, &lwork, &info);
+
+  //writeArrayToFile(A, ns*ns, "DSYEV_out_A.txt");
+  //writeArrayToFile(b, ns, "DSYEV_out_b.txt");
 
   // Order eigenvalues and eigenvectors from largest to smallest
   for (int j=0; j<ns; j++)
@@ -2721,8 +2751,12 @@ void EAPOD::eigenvaluedecomposition(double *Phi, double *Lambda, int N)
   for (int i=0; i<ns; i++)
     Lambda[(ns-i-1)] = b[i];
 
+  //writeArrayToFile(Phi, ns*ns, "Phi_ordered.txt");
+
   // Compute the matrix Q = S * Phi
   DGEMM(&chn, &chn, &N, &ns, &ns, &alpha, S, &N, Phi, &ns, &beta, Q, &N);
+
+  //writeArrayToFile(Q, N*ns, "Q.txt");
 
   // Compute the area of each snapshot and normalize the eigenvectors
   for (int i=0; i<(N-1); i++)
@@ -2736,6 +2770,8 @@ void EAPOD::eigenvaluedecomposition(double *Phi, double *Lambda, int N)
       Phi[i + ns*m] = Phi[i + ns*m]/sqrt(area);
   }
 
+  //writeArrayToFile(Phi, ns*ns, "Phi_normalized.txt");
+
   // Enforce consistent signs for the eigenvectors
   for (int m=0; m<ns; m++) {
     if (Phi[m + ns*m] < 0.0) {
@@ -2743,6 +2779,8 @@ void EAPOD::eigenvaluedecomposition(double *Phi, double *Lambda, int N)
         Phi[i + ns*m] = -Phi[i + ns*m];
     }
   }
+
+  //writeArrayToFile(Phi, ns*ns, "Phi.txt");
 
   // Free temporary arrays
   memory->destroy(xij);

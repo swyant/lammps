@@ -89,6 +89,8 @@ class EAPOD : protected Pointers {
 
   void mvproduct(double *fij, double *c, double *dd, int N, int ndesc);
 
+  void writeArrayToFile(const double* my_arr, int size, const std::string& filename);
+
  public:
   std::vector<std::string> species;
 
