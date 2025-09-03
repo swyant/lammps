@@ -995,7 +995,6 @@ double EAPOD::peratombase_coefficients(double *cb, double *bd, int *ti)
     ei += coeff[1 + m + nc]*bd[m];
     cb[m] = coeff[1 + m + nc];
   }
-
   return ei;
 }
 
@@ -1261,6 +1260,7 @@ void EAPOD::allbody_forces(double *fij, double *forcecoeff, double *Ux, double *
 double EAPOD::peratomenergyforce2(double *fij, double *rij, double *temp,
         int *ti, int *tj, int Nj)
 {
+  //Does having this before setting fij = 0.0 lead to bugs?
   if (Nj==0) {
     return coeff[nCoeffPerElement*(ti[0]-1)];
   }
@@ -1307,6 +1307,11 @@ double EAPOD::peratomenergyforce2(double *fij, double *rij, double *temp,
     radialbasis(rbft, rbfxt, rbfyt, rbfzt, rij, besselparams, rin, rcut-rin, pdegree[0], pdegree[1], nbesselpars, Nj);
   else
     gaussianbasis(rbft, rbfxt, rbfyt, rbfzt, rij, gaussianexponents, polydegrees, rin, rcut-rin, ngaussianfuncs, Nj);
+ 
+  writeArrayToFile(rbft, Nj*ns, "rbft.txt");
+  writeArrayToFile(rbfxt, Nj*ns, "rbfxt.txt");
+  writeArrayToFile(rbfyt, Nj*ns, "rbfyt.txt");
+  writeArrayToFile(rbfzt, Nj*ns, "rbfzt.txt");
 
   char chn = 'N';
   double alpha = 1.0, beta = 0.0;
@@ -1315,9 +1320,16 @@ double EAPOD::peratomenergyforce2(double *fij, double *rij, double *temp,
   DGEMM(&chn, &chn, &Nj, &nrbfmax, &ns, &alpha, rbfyt, &Nj, Phi, &ns, &beta, rbfy, &Nj);
   DGEMM(&chn, &chn, &Nj, &nrbfmax, &ns, &alpha, rbfzt, &Nj, Phi, &ns, &beta, rbfz, &Nj);
 
+  writeArrayToFile(rbf,Nj*nrbf2, "rbf.txt");
+  writeArrayToFile(rbfx,Nj*nrbf2, "rbfx.txt");
+  writeArrayToFile(rbfy,Nj*nrbf2, "rbfy.txt");
+  writeArrayToFile(rbfz,Nj*nrbf2, "rbfz.txt");
+
   if ((nl2>0) && (Nj>0)) {
     twobodydesc(d2, rbf, tj, Nj);
   }
+
+  writeArrayToFile(d2, nl2, "d2.txt");
 
   if ((nl3 > 0) && (Nj>1)) {
     double *abf = &temp[4*n1 + n5 + 4*n2]; // Nj*K3
@@ -1328,10 +1340,23 @@ double EAPOD::peratomenergyforce2(double *fij, double *rij, double *temp,
 
     angularbasis(abf, abfx, abfy, abfz, rij, tm, pq3, Nj, K3);
 
+    writeArrayToFile(abf,Nj*K3, "abf.txt");
+    writeArrayToFile(abfx,Nj*K3, "abfx.txt");
+    writeArrayToFile(abfy,Nj*K3, "abfy.txt");
+    writeArrayToFile(abfz,Nj*K3, "abfz.txt");
+
     radialangularbasis(sumU, U, Ux, Uy, Uz, rbf, rbfx, rbfy, rbfz,
             abf, abfx, abfy, abfz, tj, Nj, K3, nrbf3, nelements);
 
+    writeArrayToFile(sumU,K3*nrbf3*nelements,"sumU.txt");
+    writeArrayToFile(U,Nj*K3*nrbf3,"U.txt");
+    writeArrayToFile(Ux,Nj*K3*nrbf3,"Ux.txt");
+    writeArrayToFile(Uy,Nj*K3*nrbf3,"Uy.txt");
+    writeArrayToFile(Uz,Nj*K3*nrbf3,"Uz.txt");
+
     threebodydesc(d3, sumU);
+
+    writeArrayToFile(d3,nl3,"d3.txt");
 
     if ((nl23>0) && (Nj>2)) {
       fourbodydesc23(d23, d2, d3);
@@ -1385,6 +1410,7 @@ double EAPOD::peratomenergyforce2(double *fij, double *rij, double *temp,
   double *forcecoeff = &cb[(nl2 + nl3 + nl4)]; // nl33
   std::fill(forcecoeff, forcecoeff + nelements * K3 * nrbf3, 0.0);
   if ((nl3 > 0) && (Nj>1)) threebody_forcecoeff(forcecoeff, cb3, sumU);
+  writeArrayToFile(forcecoeff,nelements*K3*nrbf3,"forcecoeff.txt");
   if ((nl4 > 0) && (Nj>2)) fourbody_forcecoeff(forcecoeff, cb4, sumU);
   if ((nl3 > 0) && (Nj>1)) allbody_forces(fij, forcecoeff, Ux, Uy, Uz, tj, Nj);
 
@@ -2334,6 +2360,9 @@ void EAPOD::angularbasis(double *abf, double *abfx, double *abfy, double *abfz, 
       // Get indices for angular basis function
       int m = pq[n]-1;
       int d = pq[n + K];
+      //if (n==1){
+      //std::cout << "for n=1, m=" << m << " and d=" << d << " and pq[n]=" << pq[n] << std::endl;
+      //}
 
       // Calculate angular basis function and its derivatives using recursion relation
       if (d==1) {

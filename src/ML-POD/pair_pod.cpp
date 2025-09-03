@@ -212,6 +212,18 @@ void PairPOD::writeMatrixToFile(double** my_arr, int nrows, int ncols, const std
     file.close();
 }
 
+void PairPOD::writeValueToFile(int val, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    file << std::fixed << std::setprecision(22);
+    file << val << "\n";
+    file.close();
+}
+
 void PairPOD::writeRaggedToFile(int** my_arr, int nrows, int* numneigh, const std::string& filename) {
     std::ofstream file(filename);
     if (!file) {
@@ -245,24 +257,28 @@ void PairPOD::compute(int eflag, int vflag)
 //   }
 
   double **x = atom->x; //(nlocal+nghost)*3
-  double **f = atom->f; //inum*3
+  double **f = atom->f; //(nlocal+nghost)*3
   int **firstneigh = list->firstneigh; //inum*numneigh[i] (ragged)
   int *numneigh = list->numneigh; //inum
-  int *type = atom->type; //inum
+  int *type = atom->type; //nlocal+nghost
   int *ilist = list->ilist; //inum
   int inum = list->inum;
   int nlocal = atom->nlocal;
   int newton_pair = force->newton_pair;
   int nmax = atom->nmax;
   int nghost = atom->nghost;
+  int ntypes = atom->ntypes;
     
   // assume mpirun np -1, so inum == # of atoms
   writeArrayToFile(numneigh, inum, "numneigh.txt");
-  writeArrayToFile(type, inum, "type.txt");
+  writeArrayToFile(type, nlocal+nghost, "type.txt");
   writeArrayToFile(ilist, inum, "ilist.txt");
+  writeArrayToFile(map,ntypes+1,"map.txt");
   writeMatrixToFile(x,nlocal+nghost,3,"x.txt");
-  writeMatrixToFile(f,inum,3,"f.txt");
+  writeMatrixToFile(f,nlocal+nghost,3,"f0.txt");
   writeRaggedToFile(firstneigh,inum,numneigh,"firstneigh.txt");
+  writeValueToFile(nlocal,"nlocal.txt");
+  writeValueToFile(nghost,"nghost.txt");
 
   double rcutsq = rcut*rcut;
   double evdwl = 0.0;
@@ -290,12 +306,14 @@ void PairPOD::compute(int eflag, int vflag)
     lammpsNeighborList(rij1, ai1, aj1, ti1, tj1, x, firstneigh, type, map, numneigh, rcutsq, i);
 
     evdwl = fastpodptr->peratomenergyforce2(fij1, rij1, tmp, ti1, tj1, nij);
-
+    std::cout << "evdwl for ii=" << ii << ": " << evdwl << std::endl;
+    writeArrayToFile(fij1,3*nij,"fij1.txt");
     // tally atomic energy to global energy
     ev_tally_full(i,2.0*evdwl,0.0,0.0,0.0,0.0,0.0);
 
     // tally atomic force to global force
     tallyforce(f, fij1, ai1, aj1, nij);
+    writeMatrixToFile(f,nij,3,"f.txt");
 
     // tally atomic stress
     if (vflag) {
@@ -307,6 +325,7 @@ void PairPOD::compute(int eflag, int vflag)
       }
     }
   }
+  writeMatrixToFile(f,nghost+nlocal,3,"f.txt");
   }
   else if (blockMode == 1) {
  // determine the number of atom blocks and divide atoms into blocks
@@ -466,6 +485,9 @@ void PairPOD::lammpsNeighborList(double *rij1, int *ai1, int *aj1, int *ti1, int
       aj1[nij] = gj;
       ti1[nij] = itype;
       tj1[nij] = map[atomtypes[gj]] + 1;
+      //if (gi ==0){
+      //  std::cout << "tj1[nij] gi==0: " <<  tj1[nij] << std::endl;
+      //}
       nij++;
     }
   }
@@ -543,6 +565,9 @@ void PairPOD::tallyforce(double **force, double *fij,  int *ai, int *aj, int N)
     int im =  ai[n];
     int jm =  aj[n];
     int nm = 3*n;
+    //if (n < 5){
+    //std::cout << "n: " << n << " im:  " << im << " jm: " << jm << " nm: " << nm << " fij[0+nm]: " << fij[0+nm] << std::endl;
+    //}
     force[im][0] += fij[0 + nm];
     force[im][1] += fij[1 + nm];
     force[im][2] += fij[2 + nm];

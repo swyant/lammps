@@ -95,6 +95,7 @@ class PairPOD : public Pair {
   void writeMatrixToFile(double** my_arr, int nrows, int ncols, const std::string& filename);
   void writeArrayToFile(const int* my_arr, int size, const std::string& filename);
   void writeRaggedToFile(int** my_arr, int nrows, int* numneigh, const std::string& filename);
+  void writeValueToFile(int val, const std::string& filename);
 
  protected:
   class EAPOD *fastpodptr;
