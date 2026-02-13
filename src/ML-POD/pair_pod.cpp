@@ -302,8 +302,14 @@ void PairPOD::coeff(int narg, char **arg)
   copy_data_from_pod_class();
   rcut = fastpodptr->rcut;
 
-  memory->destroy(fastpodptr->tmpmem);
-  memory->destroy(fastpodptr->tmpint);
+  // PATCH: Do NOT destroy tmpmem/tmpint here. The EAPOD constructor already
+  // allocated them (Njmax=100). Destroying them leaves null pointers that cause
+  // a segfault when neigh_modify exclude produces 0-neighbor atoms as the first
+  // entry in ilist (nijmax stays 0, no reallocation triggers, null deref).
+  // The EAPOD destructor handles cleanup. Reset nijmax to 0 so compute()
+  // reallocates on first use (also fixes a latent stale-nijmax bug if
+  // pair_coeff is re-issued mid-simulation).
+  nijmax = 0;
 
   for (int ii = 0; ii < np1; ii++)
     for (int jj = 0; jj < np1; jj++) cutsq[ii][jj] = fastpodptr->rcut * fastpodptr->rcut;
